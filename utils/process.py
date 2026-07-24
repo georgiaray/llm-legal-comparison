@@ -7,12 +7,26 @@ resume from partial progress if interrupted. Supports language detection, transl
 and filtering operations.
 """
 
+import sys
 import pandas as pd
 import argparse
 from pathlib import Path
 from tqdm import tqdm
 
-from translate import process_text
+# Ensure the project root is on sys.path so `utils` is importable as a package
+# whether this file is run directly (`python utils/process.py`, as documented
+# in the READMEs) or imported elsewhere (`from utils.process import ...`).
+# Without this, a bare `from translate import process_text` only works by
+# accident: it relies on Python adding the script's own directory to
+# sys.path when run directly, and breaks with ModuleNotFoundError if
+# utils.process is ever imported as part of the package instead (this is
+# exactly how utils/summarize.py already handles importing the user-supplied
+# prompts module, so this mirrors that existing convention).
+_project_root = Path(__file__).parent.parent.resolve()
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
+from utils.translate import process_text
 
 
 def process_dataframe_with_checkpoints(
