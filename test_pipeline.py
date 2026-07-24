@@ -339,7 +339,7 @@ def main():
         str(project_root / "utils" / "summarize.py"),
         "--input", str(single_doc_dir),
         "--output", str(test_summaries_dir),
-        "--prompts-module", "analysis.prompts_example",
+        "--prompts-module", "prompts.prompts_example",
         "--model", "gpt-4o-mini"  # Use cheaper model for testing
     ]
     

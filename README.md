@@ -29,12 +29,15 @@ law_comparisons/
 │   ├── summarize.py    # Generate question-focused summaries
 │   └── rag.py          # RAG utilities for vector store queries
 ├── data/               # Data folder (see data/README.md for setup)
+│   ├── groundtruth_example.xlsx  # Example ground truth data structure
 │   └── README.md       # Guide for populating the data folder
 ├── urls/               # URL lists for documents to scrape
 │   └── README.md       # Format for URL list files
-├── analysis/           # Analysis workflows and examples
-│   ├── prompts_example.py    # Example prompts module (customize for your use case)
-│   ├── groundtruth_example.xlsx  # Example ground truth data structure
+├── prompts/            # Prompts (classification/summarization/evaluation) and analysis workflow tooling
+│   ├── prompts_example.py    # Classification/summarization prompts (customize for your use case)
+│   ├── judge_prompts.py      # Evaluation/judge prompts
+│   ├── render_prompts.py     # Regenerates PROMPTS.md from the source above
+│   ├── PROMPTS.md             # Readable, generated view of all prompts
 │   └── README.md       # Analysis workflow documentation
 ├── test_pipeline.py    # Test script to verify everything works
 └── README.md           # This file
@@ -115,7 +118,7 @@ See `data/README.md` for detailed instructions.
 2. **Generate summaries** - Use `utils/summarize.py` with custom prompts
 3. **Query documents** - Use `utils/rag.py` for RAG-based retrieval
 
-See `analysis/README.md` for detailed instructions.
+See `prompts/README.md` for detailed instructions.
 
 ## Key Features
 
@@ -150,8 +153,9 @@ See `pyproject.toml` for the complete list.
 
 - **`data/README.md`** - Complete guide for setting up and populating the data folder
 - **`urls/README.md`** - Format for URL list files
-- **`analysis/README.md`** - Analysis workflow documentation
-- **`analysis/prompts_example.py`** - Example prompts module (customize for your use case)
+- **`prompts/README.md`** - Analysis workflow documentation
+- **`prompts/prompts_example.py`** - Classification/summarization prompts (customize for your use case)
+- **`prompts/PROMPTS.md`** - Readable, generated view of all prompts used in this project
 
 ## Troubleshooting
 
@@ -197,14 +201,14 @@ See `pyproject.toml` for the complete list.
 
 ### Generating Summaries
 
-1. Create your prompts module (see `analysis/prompts_example.py` as a template)
-2. Run: `python utils/summarize.py --input data/documents --output data/summaries --prompts-module analysis.prompts_example`
+1. Create your prompts module (see `prompts/prompts_example.py` as a template)
+2. Run: `python utils/summarize.py --input data/documents --output data/summaries --prompts-module prompts.prompts_example`
 
 ## Contributing
 
 This is a general-purpose framework. To adapt it for your use case:
 
-1. Customize `analysis/prompts_example.py` for your classification questions
+1. Customize `prompts/prompts_example.py` for your classification questions
 2. Modify the workflow scripts as needed
 3. Add your own analysis notebooks or scripts
 

@@ -1,3 +1,14 @@
+"""
+NOTE: These are the exact prompts used in the published study this repository
+accompanies (climate finance policy classification, questions 2-6). They are
+provided here as a guide and source of inspiration for prompt design, not as
+a generic, plug-and-play template -- if you are adapting this framework for a
+different classification task, you will need to write your own prompts
+tailored to your own taxonomy and research questions. See judge_prompts.py
+for the corresponding evaluation/judge prompts, and PROMPTS.md for a readable
+rendering of all of these prompts together.
+"""
+
 SYSTEM_PROMPT = """
 You are a domain expert in climate finance policy classification. However, you refuse to provide any categorizations. You are an expert in summarizing and providing context. You never allude to categorizations, and, in fact, if you do, you will be fired as that is someone else's job.
 

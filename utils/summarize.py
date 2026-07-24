@@ -187,7 +187,7 @@ Note: This script requires a prompts module that provides:
   - SYSTEM_PROMPT: System prompt for the LLM
   - get_all_prompts(doc_text): Function that returns a list of prompts
   
-See prompts_example.py in the analysis folder for an example implementation.
+See prompts_example.py in the prompts folder for an example implementation.
         """
     )
     parser.add_argument(
@@ -203,7 +203,7 @@ See prompts_example.py in the analysis folder for an example implementation.
     parser.add_argument(
         "--prompts-module",
         required=True,
-        help="Python module path containing SYSTEM_PROMPT and get_all_prompts function (e.g., analysis.prompts_example)"
+        help="Python module path containing SYSTEM_PROMPT and get_all_prompts function (e.g., prompts.prompts_example)"
     )
     parser.add_argument(
         "--max-tokens",
