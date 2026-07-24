@@ -1,0 +1,39 @@
+# This CITATION.cff file was generated to make this software citable.
+# Visit https://citation-file-format.github.io/ for more information.
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "VectorLaw"
+abstract: >-
+  A pipeline for scraping, processing, embedding, summarizing, and
+  LLM-classifying legal and policy documents across jurisdictions, built for
+  multi-jurisdictional comparative legal/policy analysis.
+authors:
+  - family-names: "Ray"
+    given-names: "Georgia"
+    email: "99gray@gmail.com"
+version: "0.1.0"
+date-released: "2026-07-24"
+license: "MIT"
+repository-code: "https://github.com/georgiaray/climate-finance-legal-comparison"
+keywords:
+  - legal informatics
+  - comparative law
+  - climate policy
+  - large language models
+  - retrieval-augmented generation
+  - text classification
+
+# TODO: once the accompanying paper is published/has a DOI, add a
+# `preferred-citation` entry here so citing tools point readers to the paper
+# rather than just the software, e.g.:
+#
+# preferred-citation:
+#   type: article
+#   title: "<paper title>"
+#   authors:
+#     - family-names: "Ray"
+#       given-names: "Georgia"
+#   journal: "<journal name>"
+#   year: <year>
+#   doi: "<doi>"

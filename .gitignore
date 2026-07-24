@@ -7,6 +7,10 @@
 *.xlsx
 *.pkl
 
+# config/ holds tracked, load-bearing JSON (not disposable data output),
+# so exempt it from the blanket *.json rule above.
+!config/*.json
+
 # Python cache files
 __pycache__/
 *.py[cod]

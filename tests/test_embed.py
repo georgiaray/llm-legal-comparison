@@ -1,5 +1,7 @@
 """Unit tests for utils/embed.py: chunk_text and trim_non_content."""
-from utils.embed import chunk_text, trim_non_content
+import pytest
+
+from utils.embed import chunk_text, trim_non_content, load_boilerplate_patterns
 
 
 class TestChunkText:
@@ -61,17 +63,32 @@ class TestTrimNonContent:
         assert "Date modified" not in cleaned
         assert "The actual law text." in cleaned
 
-    def test_strips_canada_ca_header_and_footer_together(self):
+    def test_strips_canada_ca_header_and_footer_with_canada_jurisdiction(self):
+        # Canada-specific boilerplate is no longer stripped by default -- it
+        # requires explicitly opting into the "canada" jurisdiction/preset.
         text = (
             "Canada.ca\n"
             "Government of Canada\n"
             "Main content of the legal document follows here, describing the policy in detail.\n"
             "Report a problem or mistake on this page. Date modified: 2024-06-01"
         )
-        cleaned = trim_non_content(text)
+        cleaned = trim_non_content(text, jurisdiction="canada")
         assert "Canada.ca" not in cleaned
         assert "Report a problem" not in cleaned
         assert "Main content of the legal document" in cleaned
+
+    def test_default_jurisdiction_does_not_strip_canada_specific_boilerplate(self):
+        # Regression check for the generalization fix: the "default" preset
+        # must not silently apply Canada.ca-specific stripping to documents
+        # from other jurisdictions.
+        text = "Canada.ca\nGovernment of Canada\nSome real content here."
+        cleaned = trim_non_content(text, jurisdiction="default")
+        assert "Canada.ca" in cleaned
+        assert "Government of Canada" in cleaned
+
+    def test_unknown_jurisdiction_raises(self):
+        with pytest.raises(KeyError):
+            trim_non_content("some text", jurisdiction="not_a_real_jurisdiction")
 
     def test_plain_text_without_boilerplate_is_preserved(self):
         text = "This document has no navigation chrome at all, just legal text."
@@ -79,3 +96,20 @@ class TestTrimNonContent:
 
     def test_empty_text(self):
         assert trim_non_content("") == ""
+
+
+class TestLoadBoilerplatePatterns:
+    def test_default_jurisdiction_has_expected_keys(self):
+        patterns = load_boilerplate_patterns("default")
+        assert set(patterns.keys()) == {"head_patterns", "tail_patterns", "keywords"}
+        assert len(patterns["head_patterns"]) > 0
+
+    def test_canada_jurisdiction_available(self):
+        patterns = load_boilerplate_patterns("canada")
+        assert any("Canada" in p for p in patterns["tail_patterns"] + patterns["keywords"])
+
+    def test_missing_config_file_falls_back_gracefully(self, tmp_path):
+        missing_path = tmp_path / "does_not_exist.json"
+        patterns = load_boilerplate_patterns("default", config_path=missing_path)
+        # Should fall back to built-in minimal patterns rather than raising.
+        assert len(patterns["head_patterns"]) > 0

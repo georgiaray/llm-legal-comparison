@@ -9,14 +9,64 @@ them to a vector store for later retrieval.
 
 import os
 import re
+import json
 import argparse
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 import pickle
 
 import numpy as np
 from dotenv import load_dotenv
 from openai import OpenAI
+
+# Default location of the boilerplate pattern config used by trim_non_content().
+DEFAULT_BOILERPLATE_CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "boilerplate_patterns.json"
+
+# Minimal built-in fallback, used only if the config file above can't be found/
+# loaded, so trim_non_content() still degrades gracefully rather than failing.
+_FALLBACK_PATTERNS = {
+    "default": {
+        "head_patterns": [r"^Skip to main content[\n\r]+", r"^Skip to [^\n]+\n"],
+        "tail_patterns": [r"\nDate modified:[^\n]*$"],
+        "keywords": ["Back to top", "Contact us"],
+    }
+}
+
+
+def load_boilerplate_patterns(jurisdiction: str = "default", config_path: Optional[Path] = None) -> Dict[str, List[str]]:
+    """
+    Load head/tail regex patterns and non-content keywords for a given
+    jurisdiction from the boilerplate patterns config file.
+
+    Args:
+        jurisdiction: Key into the config file (e.g. "default", "canada").
+            Add your own jurisdiction entry to the config file rather than
+            hardcoding new patterns in this module -- see config/README.md.
+        config_path: Path to the JSON config file. Defaults to
+            config/boilerplate_patterns.json at the project root.
+
+    Returns:
+        Dict with 'head_patterns', 'tail_patterns', and 'keywords' lists.
+    """
+    path = config_path or DEFAULT_BOILERPLATE_CONFIG_PATH
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            all_patterns = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"⚠️  Could not load boilerplate config from {path} ({e}); using minimal built-in fallback patterns.")
+        all_patterns = _FALLBACK_PATTERNS
+        jurisdiction = "default"
+
+    if jurisdiction not in all_patterns:
+        available = [k for k in all_patterns.keys() if not k.startswith("_")]
+        raise KeyError(f"Unknown jurisdiction '{jurisdiction}'. Available: {available}. Add it to {path} to define new patterns.")
+
+    entry = all_patterns[jurisdiction]
+    return {
+        "head_patterns": entry.get("head_patterns", []),
+        "tail_patterns": entry.get("tail_patterns", []),
+        "keywords": entry.get("keywords", []),
+    }
 
 
 def chunk_text(text: str, chunk_size: int = 200, chunk_overlap: int = 75) -> List[str]:
@@ -52,48 +102,34 @@ def chunk_text(text: str, chunk_size: int = 200, chunk_overlap: int = 75) -> Lis
     return chunks
 
 
-def trim_non_content(text: str) -> str:
+def trim_non_content(text: str, jurisdiction: str = "default", config_path: Optional[Path] = None) -> str:
     """
     Attempts to trim repeated navigation/boilerplate 'chrome' text
     like headers, navbars, footers, menus, and non-content at the head and tail of the doc.
     Not guaranteed to catch everything, but tries to remove common patterns.
-    
+
+    Patterns are loaded from a config file (config/boilerplate_patterns.json by
+    default) rather than hardcoded, since boilerplate text is inherently
+    jurisdiction/site-specific. The "default" jurisdiction is a conservative,
+    generic set; a "canada" jurisdiction is also provided (the exact patterns
+    this function used to hardcode for Canada.ca pages). Add your own
+    jurisdiction to the config file for other sites -- see config/README.md.
+
     Args:
         text: Text to clean
-    
+        jurisdiction: Which pattern set to use (default: "default", generic).
+            Pass "canada" for the Canada.ca-specific patterns, or add your own
+            entry to the config file for other jurisdictions/sites.
+        config_path: Optional path to a boilerplate patterns JSON config file,
+            overriding the default location.
+
     Returns:
         Cleaned text
     """
-    # Common boilerplate phrases likely indicating start/end of content
-    head_patterns = [
-        r"^(?:.*Canada\.ca.*\n){1,5}",  # Canada.ca spam header
-        r"^Skip to main content[\n\r]+", 
-        r"^Skip to [^\n]+\n", 
-        r"^Language selection\n", 
-        r"^(?:Français|fr|Gouvernement du Canada)[\n/ ]+",
-        r"^Search[^\n]*\n", 
-        r"^Menu\n", 
-        r"^Main\n", 
-        r"^[\w \-/]+\nJobs and the workplace\n",  # menu bar spam
-        r"^(?:[\w ,/&-]+\n){3,10}You are here:[^\n]*\n",  # Common 'menu' preamble
-        r"^From:[^\n]+\n News release[\n]*",  # News release preamble
-    ]
-
-    # Extended tail patterns to catch press/media contact and keyword megamenus
-    tail_patterns = [
-        r"\nReport a problem or mistake on this page.*$", 
-        r"\nDate modified:[^\n]*$", 
-        r"\n(?:Footer|End of Document|Contact us)[^\n]*$", 
-        r"\nThis page was last updated.*$",
-        r"\nFor media:[\s\S]+?(?=\n\S)",  # Stop at next headline, non-indented line
-        r"\nMedia Relations[\s\S]+?(?=\n\S|\Z)",
-        r"(?:\n[\w \-.,/:\(\)@]+){6,}[\s\n]*$",  # If 6+ consecutive lines of mostly names, contacts, orgs
-        r"\nSearch for related information by keyword:[\s\S]+?(?=\n\S|\Z)",
-        r"\nPage details[\s\S]+?(?=\n\S|\Z)",
-        r"\nAbout this site[\s\S]+?(?=\n\S|\Z)",
-        r"\nGovernment of Canada[\s\S]+?(?=\n\S|\Z)",
-        r"\nAll contacts[\s\S]+?(?=\n\S|\Z)",
-    ]
+    patterns = load_boilerplate_patterns(jurisdiction, config_path)
+    head_patterns = patterns["head_patterns"]
+    tail_patterns = patterns["tail_patterns"]
+    non_content_keywords = patterns["keywords"]
 
     cleaned = text.strip()
 
@@ -118,27 +154,14 @@ def trim_non_content(text: str) -> str:
             if len(cleaned_new) < len(cleaned) - 8:
                 cleaned = cleaned_new
 
-    # Secondary: For repeated menu/footer junk, try to cut on keyword
-    NON_CONTENT_KEYWORDS = [
-        "You are here:",
-        "Main Menu",
-        "Search Canada.ca",
-        "Back to top",
-        "Date modified:", 
-        "Report a problem or mistake on this page",
-        "Contact us",
-        "Page details",
-        "About this site",
-        "Government of Canada",
-        "All contacts",
-    ]
+    # Secondary: For repeated menu/footer junk, try to cut on keyword.
     # Remove lines at top or bottom containing only these keywords
     lines = cleaned.splitlines()
     # Remove leading non-content lines
-    while lines and any(k.lower() in lines[0].lower() for k in NON_CONTENT_KEYWORDS):
+    while lines and any(k.lower() in lines[0].lower() for k in non_content_keywords):
         lines = lines[1:]
     # Remove trailing non-content lines
-    while lines and any(k.lower() in lines[-1].lower() for k in NON_CONTENT_KEYWORDS):
+    while lines and any(k.lower() in lines[-1].lower() for k in non_content_keywords):
         lines = lines[:-1]
 
     return "\n".join(lines).strip()
@@ -192,6 +215,9 @@ Examples:
   
   # Custom chunk size and overlap
   python utils/embed.py --input data/documents --output data/vectors.pkl --chunk-size 300 --chunk-overlap 100
+
+  # Use the Canada.ca-specific boilerplate patterns instead of the generic default
+  python utils/embed.py --input data/canada --output data/vectors.pkl --jurisdiction canada
         """
     )
     parser.add_argument(
@@ -232,7 +258,18 @@ Examples:
         action="store_true",
         help="Skip trimming boilerplate/navigation content from documents (trimming is enabled by default)"
     )
-    
+    parser.add_argument(
+        "--jurisdiction",
+        default="default",
+        help="Boilerplate pattern set to use for --trim-content, from config/boilerplate_patterns.json "
+             "(default: 'default', a generic/conservative set; 'canada' is also provided for Canada.ca pages)"
+    )
+    parser.add_argument(
+        "--boilerplate-config",
+        default=None,
+        help="Path to a custom boilerplate patterns JSON config file (default: config/boilerplate_patterns.json)"
+    )
+
     args = parser.parse_args()
     
     # Load environment variables
@@ -260,11 +297,16 @@ Examples:
     documents = load_documents(input_dir)
     print(f"Loaded {len(documents)} documents")
     
-    # Trim content (default behavior, matching original notebook)
+    # Trim content (enabled by default; jurisdiction-configurable, see config/boilerplate_patterns.json)
     if not args.no_trim_content:
-        print("Trimming boilerplate content...")
+        print(f"Trimming boilerplate content (jurisdiction: {args.jurisdiction})...")
+        boilerplate_config_path = Path(args.boilerplate_config) if args.boilerplate_config else None
         for doc_name in documents:
-            documents[doc_name] = trim_non_content(documents[doc_name])
+            documents[doc_name] = trim_non_content(
+                documents[doc_name],
+                jurisdiction=args.jurisdiction,
+                config_path=boilerplate_config_path,
+            )
     
     # Chunk documents
     print(f"Chunking documents (size={args.chunk_size}, overlap={args.chunk_overlap})...")

@@ -1,42 +1,53 @@
 [tool.poetry]
-name = "law-comparisons"
+name = "vectorlaw"
 version = "0.1.0"
-description = "A project for analyzing and comparing legal documents"
-authors = ["Your Name <your.email@example.com>"]
+description = "VectorLaw: a pipeline for scraping, embedding, summarizing, and LLM-classifying legal and policy documents for comparative analysis"
+authors = ["Georgia Ray <99gray@gmail.com>"]
 # readme = "README.md"
 # packages = [{include = "law_comparisons", from = "."}]
 
 [tool.poetry.dependencies]
 python = "^3.9,<3.13"
-pandas = "^2.0.0"
-numpy = "^1.24.0"
-jupyter = "^1.0.0"
-matplotlib = "^3.7.0"
-seaborn = "^0.12.0"
-scikit-learn = "^1.3.0"
-plotly = "^5.15.0"
-requests = "^2.31.0"
-pypdf2 = "^3.0.1"
-pymupdf = "^1.23.0"
-tqdm = "^4.67.1"
-googletrans = "^4.0.2"
-nltk = "^3.9.2"
-deep-translator = "^1.11.4"
-transformers = "^4.57.1"
-sentencepiece = "^0.2.1"
-pdf2image = "^1.17.0"
-pytesseract = "^0.3.13"
-dotenv = "^0.9.9"
-openai = "^2.6.0"
-langdetect = "^1.0.9"
-fuzzywuzzy = "^0.18.0"
-tiktoken = "^0.12.0"
+# Reproducibility-critical: these directly affect LLM call behavior and token
+# counting, so version drift here can silently change results. Exact-pinned
+# rather than left on a caret range -- bump deliberately, not automatically.
+openai = "2.6.0"
+tiktoken = "0.12.0"
+langdetect = "1.0.9"
+# Everything else: tightened from caret (^, allows minor-version bumps) to
+# tilde (~, patch-level only), matching the versions already resolved in
+# poetry.lock, so an incidental `poetry update` can't silently jump a minor
+# version and change behavior.
+pandas = "~2.3.3"
+numpy = "~1.26.4"
+jupyter = "~1.1.1"
+matplotlib = "~3.9.4"
+seaborn = "~0.12.2"
+scikit-learn = "~1.6.1"
+plotly = "~5.24.1"
+requests = "~2.32.5"
+pypdf2 = "~3.0.1"
+pymupdf = "~1.26.5"
+tqdm = "~4.67.1"
+googletrans = "~4.0.2"
+nltk = "~3.9.2"
+deep-translator = "~1.11.4"
+transformers = "~4.57.1"
+sentencepiece = "~0.2.1"
+pdf2image = "~1.17.0"
+pytesseract = "~0.3.13"
+# NOTE: was previously "dotenv" (^0.9.9) -- that's a different, unmaintained
+# PyPI package with a different API. The code imports `from dotenv import
+# load_dotenv`, which is provided by python-dotenv; only worked before because
+# python-dotenv was present transitively. Now declared directly.
+python-dotenv = "~1.1.1"
+fuzzywuzzy = "~0.18.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
-black = "^23.0.0"
-flake8 = "^6.1.0"
-mypy = "^1.5.0"
+pytest = "~7.4.4"
+black = "~23.12.1"
+flake8 = "~6.1.0"
+mypy = "~1.18.2"
 
 [build-system]
 requires = ["poetry-core"]

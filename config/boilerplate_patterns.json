@@ -1,0 +1,66 @@
+{
+  "_comment": "Boilerplate/navigation patterns for utils/embed.py's trim_non_content(). Keyed by jurisdiction. 'default' is a conservative, jurisdiction-agnostic set (low risk of stripping real content). Add your own jurisdiction key here rather than editing 'default' -- see README.md in this folder.",
+
+  "default": {
+    "head_patterns": [
+      "^Skip to main content[\\n\\r]+",
+      "^Skip to [^\\n]+\\n",
+      "^Menu\\n",
+      "^Main\\n"
+    ],
+    "tail_patterns": [
+      "\\nDate modified:[^\\n]*$",
+      "\\n(?:Footer|End of Document|Contact us)[^\\n]*$",
+      "\\nThis page was last updated.*$"
+    ],
+    "keywords": [
+      "Date modified:",
+      "Back to top",
+      "Contact us"
+    ]
+  },
+
+  "canada": {
+    "_comment": "Patterns for Canada.ca / Government of Canada pages, as originally hardcoded in trim_non_content(). Pass jurisdiction='canada' (or --jurisdiction canada on the embed.py CLI) to use these.",
+    "head_patterns": [
+      "^(?:.*Canada\\.ca.*\\n){1,5}",
+      "^Skip to main content[\\n\\r]+",
+      "^Skip to [^\\n]+\\n",
+      "^Language selection\\n",
+      "^(?:Français|fr|Gouvernement du Canada)[\\n/ ]+",
+      "^Search[^\\n]*\\n",
+      "^Menu\\n",
+      "^Main\\n",
+      "^[\\w \\-/]+\\nJobs and the workplace\\n",
+      "^(?:[\\w ,/&-]+\\n){3,10}You are here:[^\\n]*\\n",
+      "^From:[^\\n]+\\n News release[\\n]*"
+    ],
+    "tail_patterns": [
+      "\\nReport a problem or mistake on this page.*$",
+      "\\nDate modified:[^\\n]*$",
+      "\\n(?:Footer|End of Document|Contact us)[^\\n]*$",
+      "\\nThis page was last updated.*$",
+      "\\nFor media:[\\s\\S]+?(?=\\n\\S)",
+      "\\nMedia Relations[\\s\\S]+?(?=\\n\\S|\\Z)",
+      "(?:\\n[\\w \\-.,/:\\(\\)@]+){6,}[\\s\\n]*$",
+      "\\nSearch for related information by keyword:[\\s\\S]+?(?=\\n\\S|\\Z)",
+      "\\nPage details[\\s\\S]+?(?=\\n\\S|\\Z)",
+      "\\nAbout this site[\\s\\S]+?(?=\\n\\S|\\Z)",
+      "\\nGovernment of Canada[\\s\\S]+?(?=\\n\\S|\\Z)",
+      "\\nAll contacts[\\s\\S]+?(?=\\n\\S|\\Z)"
+    ],
+    "keywords": [
+      "You are here:",
+      "Main Menu",
+      "Search Canada.ca",
+      "Back to top",
+      "Date modified:",
+      "Report a problem or mistake on this page",
+      "Contact us",
+      "Page details",
+      "About this site",
+      "Government of Canada",
+      "All contacts"
+    ]
+  }
+}
