@@ -18,8 +18,11 @@ import os
 import sys
 import subprocess
 import tempfile
+import pickle
 from pathlib import Path
 from shutil import rmtree
+
+import pandas as pd
 
 
 def print_step(step_num, description):
@@ -125,7 +128,20 @@ def main():
     if len(scraped_files) == 0:
         print("❌ Error: No documents were scraped. Cannot continue.")
         sys.exit(1)
-    
+
+    # Verify scraped files actually contain text, not just that they exist.
+    # A "successful" scrape that wrote a 0-byte file (e.g. extraction silently
+    # failed) would otherwise pass every downstream check.
+    empty_scraped_files = [f for f in scraped_files if f.stat().st_size == 0]
+    try:
+        assert not empty_scraped_files, (
+            f"{len(empty_scraped_files)} scraped file(s) are empty: "
+            f"{[f.name for f in empty_scraped_files]}"
+        )
+    except AssertionError as e:
+        print(f"❌ Error: {e}")
+        sys.exit(1)
+
     # Step 3: Extract text (using extract.py)
     print_step(3, "Testing extract.py - Extracting text from files")
     
@@ -142,7 +158,24 @@ def main():
         if test_extracted_csv.exists():
             size = test_extracted_csv.stat().st_size
             print(f"✅ Extracted CSV created: {size:,} bytes")
-    
+
+            # Validate the CSV's actual contents, not just that the file exists.
+            try:
+                extracted_df = pd.read_csv(test_extracted_csv, escapechar="\\")
+                assert {"file", "text"}.issubset(extracted_df.columns), (
+                    f"Expected 'file' and 'text' columns, got: {list(extracted_df.columns)}"
+                )
+                assert len(extracted_df) == len(scraped_files), (
+                    f"Expected {len(scraped_files)} rows (one per scraped file), "
+                    f"got {len(extracted_df)}"
+                )
+                non_empty = extracted_df["text"].fillna("").str.len().gt(0).sum()
+                assert non_empty > 0, "All extracted 'text' values are empty"
+                print(f"✅ Extracted CSV validated: {non_empty}/{len(extracted_df)} rows have text")
+            except AssertionError as e:
+                print(f"❌ Error: Extracted CSV failed validation: {e}")
+                sys.exit(1)
+
     # Step 4: Process text (language detection only, to save costs)
     print_step(4, "Testing process.py - Language detection (detect_only mode)")
     
@@ -161,20 +194,30 @@ def main():
             if test_processed_csv.exists():
                 size = test_processed_csv.stat().st_size
                 print(f"✅ Processed CSV created: {size:,} bytes")
-                # Show language distribution
+                # Show language distribution, and validate detection actually ran
+                # rather than just checking the file was written.
                 try:
-                    import pandas as pd
                     df = pd.read_csv(test_processed_csv, escapechar='\\')
-                    if 'detected_language' in df.columns:
-                        lang_counts = df['detected_language'].value_counts()
-                        print(f"\nLanguage distribution:")
-                        for lang, count in lang_counts.items():
-                            print(f"   - {lang}: {count}")
+                    assert 'detected_language' in df.columns, (
+                        "Processed CSV is missing the 'detected_language' column"
+                    )
+                    lang_counts = df['detected_language'].value_counts()
+                    print(f"\nLanguage distribution:")
+                    for lang, count in lang_counts.items():
+                        print(f"   - {lang}: {count}")
+
+                    known_lang_count = (df['detected_language'] != 'unknown').sum()
+                    assert known_lang_count > 0, (
+                        "Language detection returned 'unknown' for every row"
+                    )
+                except AssertionError as e:
+                    print(f"❌ Error: Language detection failed validation: {e}")
+                    sys.exit(1)
                 except Exception as e:
                     print(f"⚠️  Could not show language distribution: {e}")
     
     # Step 5: Create vector store
-    print_step(3, "Creating vector store from scraped documents")
+    print_step(5, "Creating vector store from scraped documents")
     
     embed_cmd = [
         sys.executable,
@@ -195,7 +238,34 @@ def main():
     else:
         print("❌ Error: Vector store file not found")
         sys.exit(1)
-    
+
+    # Validate the pickle's internal structure, not just that a non-empty file
+    # exists — a truncated or malformed pickle would otherwise pass silently.
+    try:
+        with open(test_vector_store, "rb") as f:
+            vector_store_contents = pickle.load(f)
+
+        assert isinstance(vector_store_contents, dict) and len(vector_store_contents) > 0, (
+            "Vector store is empty or not a dict"
+        )
+        for doc_name, entry in vector_store_contents.items():
+            assert "embeddings" in entry and "chunks" in entry, (
+                f"Document '{doc_name}' is missing 'embeddings' or 'chunks'"
+            )
+            n_embeddings = len(entry["embeddings"])
+            n_chunks = len(entry["chunks"])
+            assert n_embeddings == n_chunks and n_embeddings > 0, (
+                f"Document '{doc_name}' has {n_embeddings} embeddings but "
+                f"{n_chunks} chunks (expected equal, non-zero counts)"
+            )
+            assert all(len(vec) > 0 for vec in entry["embeddings"]), (
+                f"Document '{doc_name}' has one or more zero-length embedding vectors"
+            )
+        print(f"✅ Vector store structure validated: {len(vector_store_contents)} documents")
+    except AssertionError as e:
+        print(f"❌ Error: Vector store failed structural validation: {e}")
+        sys.exit(1)
+
     # Step 6: Test RAG utilities
     print_step(6, "Testing rag.py - Loading vector store and querying")
     
@@ -223,12 +293,24 @@ def main():
                 
                 from utils.rag import query_document
                 results = query_document(
-                    store, 
-                    client, 
-                    test_doc_name, 
-                    "What is this document about?", 
+                    store,
+                    client,
+                    test_doc_name,
+                    "What is this document about?",
                     top_k=2
                 )
+
+                # Validate the shape of what came back, not just that the call
+                # didn't raise.
+                assert isinstance(results, list), "query_document should return a list"
+                for r in results:
+                    assert {"chunk_index", "similarity", "text"}.issubset(r.keys()), (
+                        f"Result missing expected keys: {list(r.keys())}"
+                    )
+                    assert isinstance(r["text"], str) and len(r["text"]) > 0, (
+                        "Result chunk text is empty"
+                    )
+
                 print(f"✅ Query successful: Retrieved {len(results)} chunks")
                 if results:
                     print(f"   Top chunk similarity: {results[0]['similarity']:.3f}")
@@ -273,8 +355,17 @@ def main():
         for f in sorted(summary_files):
             size = f.stat().st_size
             print(f"   - {f.name}: {size:,} bytes")
+
+        try:
+            assert len(summary_files) > 0, "No summary files were written"
+            empty_summaries = [f.name for f in summary_files if f.stat().st_size == 0]
+            assert not empty_summaries, f"Empty summary file(s): {empty_summaries}"
+        except AssertionError as e:
+            print(f"❌ Error: Summaries failed validation: {e}")
+            sys.exit(1)
     else:
-        print("⚠️  Warning: Summary directory not found")
+        print("❌ Error: Summary directory not found")
+        sys.exit(1)
     
     # Step 8: Test exploration.py (if sample data exists)
     print_step(8, "Testing exploration.py - Analyzing sample dataset")
@@ -296,6 +387,18 @@ def main():
     
     # Final summary
     print_step(9, "Test Complete!")
+
+    # Precompute this rather than inlining a conditional in the f-string below:
+    # the previous version put the `if/else` outside the `{...}` braces around
+    # `.stat().st_size`, so it (a) printed the literal text "bytes if
+    # test_vector_store.exists() else 'N/A'" instead of evaluating it, and
+    # (b) called .stat() unconditionally, which would raise if the file didn't
+    # exist.
+    if test_vector_store.exists():
+        vector_store_size_str = f"{test_vector_store.stat().st_size:,} bytes"
+    else:
+        vector_store_size_str = "N/A"
+
     print(f"""
 ✅ Pipeline test completed successfully!
 
@@ -304,7 +407,7 @@ Summary:
   - Documents scraped: {len(scraped_files)}
   - Text extraction: {'✅' if test_extracted_csv.exists() else '❌'}
   - Language detection: {'✅' if test_processed_csv.exists() else '❌'}
-  - Vector store created: {test_vector_store.name if test_vector_store.exists() else 'N/A'} ({test_vector_store.stat().st_size:,} bytes if test_vector_store.exists() else 'N/A')
+  - Vector store created: {test_vector_store.name if test_vector_store.exists() else 'N/A'} ({vector_store_size_str})
   - RAG utilities: {'✅ Tested' if test_vector_store.exists() else '⚠️ Skipped'}
   - Document analyzed: {test_doc_name}
   - Summaries created: {len(summary_files) if summary_dir.exists() else 0}
