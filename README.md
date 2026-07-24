@@ -40,6 +40,7 @@ law_comparisons/
 │   ├── PROMPTS.md             # Readable, generated view of all prompts
 │   └── README.md       # Analysis workflow documentation
 ├── test_pipeline.py    # Test script to verify everything works
+├── Makefile            # One-command entry points (make all, make help, etc.)
 └── README.md           # This file
 ```
 
@@ -100,6 +101,17 @@ All test data goes into `test_data/` directory, which you can delete after testi
 **The test pipeline serves two purposes:**
 1. **Verification** - Confirms all utilities are working correctly
 2. **Learning** - Demonstrates how to use each script in the workflow
+
+### 5. Or Run the Full Pipeline with One Command
+
+A `Makefile` wraps the whole scrape → extract → process → embed → summarize
+workflow so you don't have to stitch together five CLI calls by hand:
+
+```bash
+make all                                       # runs against the bundled example URLs
+make all DATASET=canada URLS_FILE=urls/canada_urls.txt   # or your own data
+make help                                      # see all targets and overridable variables
+```
 
 ## Workflow Overview
 
