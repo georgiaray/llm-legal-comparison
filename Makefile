@@ -30,6 +30,23 @@ BOILERPLATE_JURISDICTION ?= default
 PROMPTS_MODULE         ?= prompts.prompts_example
 MODEL                  ?= gpt-4o-mini
 
+# `make evaluate` config. There is no usable default for EVAL_GROUNDTRUTH or
+# EVAL_PREDICTIONS -- data/groundtruth_example.xlsx only shows the expected
+# *shape* of a groundtruth file (its label columns are empty), and no example
+# predictions file is bundled at all. You must supply both yourself, e.g.:
+#   make evaluate EVAL_GROUNDTRUTH=data/my_groundtruth.csv EVAL_PREDICTIONS=data/my_predictions.csv EVAL_QUESTIONS=question_2,question_3
+# See prompts/evaluate.py's module docstring before running this -- in
+# particular, precision/recall against a classification taxonomy is not a
+# fully objective metric; read that docstring's warning before trusting the
+# numbers it prints.
+EVAL_GROUNDTRUTH       ?=
+EVAL_PREDICTIONS       ?=
+EVAL_TAXONOMY          ?= prompts/evaluate_taxonomy_example.json
+EVAL_QUESTIONS         ?=
+EVAL_JOIN_KEY          ?= unique_id
+EVAL_THRESHOLD         ?= 85
+EVAL_OUTPUT            ?= data/evaluation_results
+
 PYTHON ?= python3
 
 .PHONY: help all scrape extract process embed summarize evaluate test clean
@@ -43,7 +60,7 @@ help:
 	@echo "  make process     Language-detect/translate the extracted CSV"
 	@echo "  make embed       Chunk + embed SCRAPED_DIR into VECTOR_STORE"
 	@echo "  make summarize   Generate question-focused summaries into SUMMARIES_DIR"
-	@echo "  make evaluate    Not yet implemented -- see FIXES.md item 6"
+	@echo "  make evaluate    Score EVAL_PREDICTIONS against EVAL_GROUNDTRUTH (both required -- no bundled example data)"
 	@echo "  make test        Run the pytest unit test suite"
 	@echo "  make clean       Remove generated outputs for DATASET (not raw scraped text)"
 	@echo ""
@@ -81,8 +98,33 @@ summarize:
 		--model $(MODEL)
 
 evaluate:
-	@echo "evaluate.py has not been implemented yet -- see FIXES.md item 6."
-	@echo "Once it exists, wire it up here rather than leaving 'make all' incomplete."
+ifeq ($(strip $(EVAL_GROUNDTRUTH)),)
+	@echo "ERROR: EVAL_GROUNDTRUTH is required and has no default -- you need your own"
+	@echo "human-labeled groundtruth file (data/groundtruth_example.xlsx only shows the"
+	@echo "expected shape; its label columns are empty). Example:"
+	@echo "  make evaluate EVAL_GROUNDTRUTH=data/my_groundtruth.csv EVAL_PREDICTIONS=data/my_predictions.csv EVAL_QUESTIONS=question_2,question_3"
+	@exit 1
+endif
+ifeq ($(strip $(EVAL_PREDICTIONS)),)
+	@echo "ERROR: EVAL_PREDICTIONS is required and has no default -- no example"
+	@echo "predictions file is bundled with this repo. Point it at your own model"
+	@echo "output, in the same shape as EVAL_GROUNDTRUTH (see prompts/evaluate.py --help)."
+	@exit 1
+endif
+ifeq ($(strip $(EVAL_QUESTIONS)),)
+	@echo "ERROR: EVAL_QUESTIONS is required, e.g. EVAL_QUESTIONS=question_2,question_3"
+	@echo "(must match column names in both EVAL_GROUNDTRUTH and EVAL_PREDICTIONS, and"
+	@echo "must exist as keys in EVAL_TAXONOMY=$(EVAL_TAXONOMY))."
+	@exit 1
+endif
+	$(PYTHON) prompts/evaluate.py \
+		--groundtruth $(EVAL_GROUNDTRUTH) \
+		--predictions $(EVAL_PREDICTIONS) \
+		--taxonomy $(EVAL_TAXONOMY) \
+		--questions $(EVAL_QUESTIONS) \
+		--join-key $(EVAL_JOIN_KEY) \
+		--threshold $(EVAL_THRESHOLD) \
+		--output $(EVAL_OUTPUT)
 
 test:
 	$(PYTHON) -m pytest

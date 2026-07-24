@@ -38,6 +38,8 @@ law_comparisons/
 │   ├── judge_prompts.py      # Evaluation/judge prompts
 │   ├── render_prompts.py     # Regenerates PROMPTS.md from the source above
 │   ├── PROMPTS.md             # Readable, generated view of all prompts
+│   ├── evaluate.py            # Precision/recall/F1 of predictions against a groundtruth set (bring your own data -- see script docstring)
+│   ├── evaluate_taxonomy_example.json  # Example taxonomy config for evaluate.py (the real study's Q2-Q5 schema)
 │   └── README.md       # Analysis workflow documentation
 ├── test_pipeline.py    # Test script to verify everything works
 ├── Makefile            # One-command entry points (make all, make help, etc.)
@@ -129,6 +131,7 @@ See `data/README.md` for detailed instructions.
 1. **Create embeddings** - Use `utils/embed.py` to create vector stores
 2. **Generate summaries** - Use `utils/summarize.py` with custom prompts
 3. **Query documents** - Use `utils/rag.py` for RAG-based retrieval
+4. **Evaluate classification quality** - Use `prompts/evaluate.py` (or `make evaluate`) to score model predictions against a human-labeled groundtruth set with precision/recall/F1. **Requires your own groundtruth and predictions** — no usable example data ships with the repo, only a structural template. Read the script's module docstring before trusting its output: precision/recall against a classification taxonomy is not a fully objective metric, and low scores can reflect legitimate taxonomy ambiguity as much as model error.
 
 See `prompts/README.md` for detailed instructions.
 
@@ -168,6 +171,7 @@ See `pyproject.toml` for the complete list.
 - **`prompts/README.md`** - Analysis workflow documentation
 - **`prompts/prompts_example.py`** - Classification/summarization prompts (customize for your use case)
 - **`prompts/PROMPTS.md`** - Readable, generated view of all prompts used in this project
+- **`prompts/evaluate.py`** - Precision/recall/F1 evaluation against a groundtruth set; read its module docstring before use (bring-your-own-data, and a caveat about subjectivity)
 
 ## Troubleshooting
 
